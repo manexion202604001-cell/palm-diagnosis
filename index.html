@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>手相×算命学 診断アプリ</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    margin: 0;
+    padding: 0;
+  }
+  .mincho { font-family: 'Shippori Mincho', serif; }
+  input[type="file"] { display: none; }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  
+  .fade-in { animation: fadeIn 0.6s ease-out; }
+  .spin { animation: spin 2s linear infinite; }
+  .pulse { animation: pulse 2s ease-in-out infinite; }
+  .shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 1.5s infinite;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+const TYPES = [
+  { id: "01", name: "切り開きタイプ", subtitle: "自立・努力・現実志向", description: "自分の力で道を切り開く、努力家のリーダー。" },
+  { id: "02", name: "考えすぎタイプ", subtitle: "慎重・分析・内向", description: "頭で考えすぎてしまう、繊細な慎重派。" },
+  { id: "03", name: "行動爆速タイプ", subtitle: "直感・勢い・ポジティブ", description: "思いついたら即行動！エネルギッシュな行動派。" },
+  { id: "04", name: "リーダータイプ", subtitle: "責任感・統率・冷静", description: "みんなをまとめるカリスマ、信頼されるリーダー。" },
+  { id: "05", name: "癒しタイプ", subtitle: "優しい・共感・献身", description: "人の気持ちに寄り添える、優しい癒し系。" },
+  { id: "06", name: "完璧主義タイプ", subtitle: "几帳面・努力・美意識", description: "細部までこだわる完璧主義、努力で理想を叶える人。" },
+  { id: "07", name: "自由人タイプ", subtitle: "マイペース・創造性・個性", description: "自分らしく自由に生きる、クリエイティブな自由人。" },
+  { id: "08", name: "愛されタイプ", subtitle: "素直・明るい・社交的", description: "みんなに愛されるムードメーカー。" },
+  { id: "09", name: "孤高タイプ", subtitle: "職人気質・集中・寡黙", description: "一人の時間を大切にする、孤高の職人タイプ。" },
+  { id: "10", name: "成長途中タイプ", subtitle: "不安・努力・伸びしろ", description: "まだ自信はないけど、これから大きく成長する人。" }
+];
+
+const LINE_URL = "https://utg.manexion.co.jp/line/open/cFQ5KxswDAGI?mtid=K0wmfluUtmz6";
+
+function App() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sharedId = urlParams.get('type');
+  const sharedType = sharedId ? TYPES.find(t => t.id === sharedId) : null;
+  
+  const [step, setStep] = useState(sharedType ? 'result' : 'home');
+  const [palmImage, setPalmImage] = useState(null);
+  const [birthDate, setBirthDate] = useState({ year: '', month: '', day: '' });
+  const [type, setType] = useState(sharedType);
+  const [progress, setProgress] = useState(0);
+
+  const handleUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPalmImage(e.target.result);
+        setStep('input');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const startDiagnosis = () => {
+    setStep('loading');
+    setProgress(0);
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setType(TYPES[Math.floor(Math.random() * TYPES.length)]);
+            setStep('result');
+          }, 1000);
+          return 100;
+        }
+        return prev + 1;
+      });
+    }, 130);
+  };
+
+  return (
+    <div className="min-h-screen pb-8">
+      {step === 'home' && <Home onUpload={handleUpload} />}
+      {step === 'input' && <Input birthDate={birthDate} setBirthDate={setBirthDate} onNext={startDiagnosis} palmImage={palmImage} />}
+      {step === 'loading' && <Loading progress={progress} />}
+      {step === 'result' && <Result type={type} onLine={() => setStep('line')} />}
+      {step === 'line' && <Line type={type} onBack={() => { setStep('home'); setType(null); setPalmImage(null); }} />}
+    </div>
+  );
+}
+
+function Home({ onUpload }) {
+  return (
+    <div className="max-w-md mx-auto px-4 pt-8 fade-in">
+      <div className="text-center mb-6">
+        <div className="text-amber-600 text-xs mb-2 tracking-widest mincho">PALMISTRY × SANMEIGAKU</div>
+        <h1 className="text-3xl font-bold mb-3 mincho text-slate-800">
+          あなたの手が教える<br/>本当の運命
+        </h1>
+        <p className="text-slate-600 text-xs">手相 × 算命学で性格・恋愛・適職を診断</p>
+      </div>
+      <div className="bg-white rounded-2xl shadow-xl p-6 mb-4">
+        <div className="w-24 h-24 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center">
+          <span className="text-5xl">🖐️</span>
+        </div>
+        <h3 className="text-center font-bold mb-2">手のひらを撮影</h3>
+        <p className="text-center text-xs text-slate-600 mb-6">明るい場所で、指を広げて撮影してください</p>
+        <input type="file" accept="image/*" capture="environment" onChange={onUpload} id="palm-upload" />
+        <button onClick={() => document.getElementById('palm-upload').click()} className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 rounded-xl font-bold shadow-lg active:scale-95">
+          📸 カメラを起動
+        </button>
+        <button onClick={() => document.getElementById('palm-upload').click()} className="w-full mt-3 text-xs text-slate-500">
+          または、ギャラリーから選択
+        </button>
+      </div>
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs">
+        <p className="font-bold mb-1">💡 撮影のコツ</p>
+        <ul className="space-y-1 text-slate-700">
+          <li>• 指を広げて手のひら全体を撮影</li>
+          <li>• 明るい場所で撮影すると精度UP</li>
+          <li>• 手のシワがはっきり見えるように</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function Input({ birthDate, setBirthDate, onNext, palmImage }) {
+  const years = Array.from({ length: 100 }, (_, i) => 2026 - i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  const isValid = birthDate.year && birthDate.month && birthDate.day;
+
+  return (
+    <div className="max-w-md mx-auto px-4 pt-6 fade-in">
+      <div className="text-center mb-4">
+        <div className="text-amber-600 text-xs mb-2">STEP 2/2</div>
+        <h2 className="text-xl font-bold mincho mb-2">生年月日を教えてください</h2>
+      </div>
+      {palmImage && (
+        <div className="bg-white rounded-xl p-3 shadow-md mb-4 flex items-center gap-3">
+          <img src={palmImage} alt="" className="w-16 h-16 object-cover rounded-lg" />
+          <div>
+            <div className="text-xs text-slate-500">撮影完了</div>
+            <div className="text-sm font-bold">✓ 手のひら画像</div>
+          </div>
+        </div>
+      )}
+      <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+        <div className="grid grid-cols-3 gap-2 mb-6">
+          <select value={birthDate.year} onChange={(e) => setBirthDate({...birthDate, year: e.target.value})} className="p-3 border-2 border-slate-300 rounded-lg text-center bg-white">
+            <option value="">年</option>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select value={birthDate.month} onChange={(e) => setBirthDate({...birthDate, month: e.target.value})} className="p-3 border-2 border-slate-300 rounded-lg text-center bg-white">
+            <option value="">月</option>
+            {months.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <select value={birthDate.day} onChange={(e) => setBirthDate({...birthDate, day: e.target.value})} className="p-3 border-2 border-slate-300 rounded-lg text-center bg-white">
+            <option value="">日</option>
+            {days.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        <button onClick={onNext} disabled={!isValid} className={`w-full py-4 rounded-xl font-bold text-white ${isValid ? 'bg-gradient-to-r from-amber-500 to-orange-500 active:scale-95 shadow-lg' : 'bg-slate-300'}`}>
+          {isValid ? '診断を開始する →' : '生年月日を入力してください'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Loading({ progress }) {
+  const phases = [
+    { icon: '🖐️', title: '手のひらを読み取っています', sub: '画像を解析中…' },
+    { icon: '🌿', title: '生命線を分析中', sub: '体力・健康運を読み解いています' },
+    { icon: '🧠', title: '頭脳線を解析中', sub: '思考パターンを読み取っています' },
+    { icon: '💖', title: '感情線をチェック中', sub: '恋愛運・対人運を診断' },
+    { icon: '⭐', title: '運命線を読み解き中', sub: '仕事運・成功運を分析' },
+    { icon: '☀️', title: '太陽線を確認中', sub: '才能・人気運を診断' },
+    { icon: '💰', title: '財運線を分析中', sub: '金運・ビジネスセンスを判定' },
+    { icon: '🔮', title: '算命学と統合中', sub: '生年月日と組み合わせ' },
+    { icon: '✨', title: 'あなたの本質を解析中', sub: '性格・才能を統合分析' },
+    { icon: '🎯', title: '最終診断中', sub: 'もうすぐ結果が出ます…' }
+  ];
+  const phase = phases[Math.min(Math.floor(progress / 10), 9)];
+  
+  return (
+    <div className="max-w-md mx-auto px-4 pt-12">
+      <div className="text-center">
+        <div className="relative w-32 h-32 mx-auto mb-6">
+          <div className="absolute inset-0 rounded-full border-4 border-amber-200 border-t-amber-500 spin"></div>
+          <div className="absolute inset-3 bg-amber-100 rounded-full flex items-center justify-center pulse">
+            <div className="text-5xl">{phase.icon}</div>
+          </div>
+        </div>
+        <h2 className="text-xl font-bold mincho mb-2">{phase.title}</h2>
+        <p className="text-sm text-amber-600 mb-6">{phase.sub}</p>
+        <div className="bg-white rounded-full h-3 overflow-hidden shadow-inner mb-3 mx-2 relative">
+          <div className="bg-gradient-to-r from-amber-400 to-orange-500 h-full transition-all duration-300 relative overflow-hidden" style={{ width: `${progress}%` }}>
+            <div className="absolute inset-0 shimmer"></div>
+          </div>
+        </div>
+        <div className="text-amber-600 font-bold text-lg">{progress}%</div>
+      </div>
+    </div>
+  );
+}
+
+function Result({ type, onLine }) {
+  if (!type) return null;
+  return (
+    <div className="max-w-2xl mx-auto px-4 pt-6 pb-12">
+      <div className="text-center mb-4 fade-in">
+        <h2 className="text-xl font-bold mincho mb-4">🎉 診断結果</h2>
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl shadow-xl p-8 mb-4 border-2 border-amber-300">
+          <div className="text-5xl mb-4">✨</div>
+          <div className="text-5xl font-bold text-amber-600 mb-3 mincho">{type.id}</div>
+          <h3 className="text-2xl font-bold mincho mb-2">{type.name}</h3>
+          <p className="text-sm text-amber-700 font-bold mb-4">{type.subtitle}</p>
+          <p className="text-sm text-slate-700">{type.description}</p>
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-2xl shadow-xl p-5 mb-4">
+        <div className="bg-slate-700 text-amber-400 py-3 rounded-lg mb-4 text-center font-bold mincho tracking-widest">総合結論</div>
+        <h3 className="text-lg font-bold mincho mb-4 text-center">自力で道を切り開く、<br/>仕事運の強い手相</h3>
+        <div className="space-y-2 mb-4">
+          {['仕事運は強く、努力が結果に繋がる', '独立心が強く、自分で道を作るタイプ', '論理的で戦略を立てる力に優れる', '信頼されやすいが、責任を抱え込みやすい', '考えすぎて、初動が遅れがち'].map((t, i) => (
+            <div key={i} className="flex gap-2 items-start">
+              <div className="w-5 h-5 rounded-full bg-slate-700 text-amber-400 flex items-center justify-center text-xs font-bold flex-shrink-0">{i+1}</div>
+              <p className="text-xs pt-0.5">{t}</p>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {[{l:'仕事運',s:4},{l:'恋愛運',s:3},{l:'金運',s:4},{l:'総合運',s:4}].map(x => (
+            <div key={x.l} className="bg-slate-50 rounded-lg p-3 border">
+              <div className="text-xs text-slate-500">{x.l}</div>
+              <div className="text-amber-500">{'★'.repeat(x.s)}{'☆'.repeat(5-x.s)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-4 mb-4">
+        <Section icon="🎯" title="1. まず全体像" color="amber">
+          <p className="text-sm leading-relaxed">写真からは、指が長めで掌はやや縦長、親指の開きが大きく、細かな線が多い印象が読み取れます。これは<strong>「感覚でひらめき、頭で整理し、人に伝えて形にする」</strong>タイプの手です。</p>
+        </Section>
+
+        <Section icon="📋" title="2. 主要な線の鑑定" color="white">
+          <LineCard color="green" title="🌿 生命線：環境を変えながら伸びる持久力" desc="生命線は大きくカーブし、状況に合わせてスタイルを変えながら粘れる相です。新しい挑戦に対して最初は慎重でも、一度「いける」と感じると継続力が出ます。" tips={[{label:"✅ 開運行動",text:"生活リズムを固定し過ぎず、集中期と回復期を分ける"},{label:"⚠️ 弱点対策",text:"人に見せる前の試作段階で時間を使い過ぎない"},{label:"🏢 合う環境",text:"変化があり、改善の余地がある現場"}]} />
+          <LineCard color="blue" title="🧠 知能線：現実と直感をつなぐクリエイティブ脳" desc="論理だけでなくイメージや雰囲気をつかむ力が強いです。「なぜそうなるのか」「どう見せると伝わるのか」を考える仕事で能力が出ます。" tips={[{label:"💪 強み",text:"企画、言語化、UX改善、資料化、提案設計"},{label:"⚠️ 注意",text:"頭の中で完成形を作りすぎ、着手が遅くなること"},{label:"📈 伸ばし方",text:"1案に絞る前に、3案出して比較する癖をつける"}]} />
+          <LineCard color="pink" title="💖 感情線：情は深いが、相手選びはかなり冷静" desc="好き嫌いははっきりあるものの、表に出す前に整理するタイプ。恋愛でも仕事でも「信頼できるか」をかなり見ています。" tips={[{label:"👥 対人運",text:"深く狭い信頼関係を作るほど運が伸びる"},{label:"💕 恋愛運",text:"勢いだけより、尊敬と安心が続く相手が合う"},{label:"⚠️ 注意",text:"察し過ぎて疲れる前に、自分の希望を言葉にする"}]} />
+          <LineCard color="purple" title="⭐ 運命線：肩書きを自分で作るタイプ" desc="「会社や組織に人生を決めてもらう」より、「やりながら自分の役割を発明する」相です。経験が増えるほど方向性が固まります。" tips={[{label:"💼 仕事運",text:"固定業務より、新規事業・改善・営業企画に相性"},{label:"✨ 開運",text:"人から頼まれたことを商品化・仕組み化すると伸びる"},{label:"⚠️ 注意",text:"器用な分、何でも屋になりすぎない"}]} last={true} />
+        </Section>
+
+        <Section icon="🧠" title="3. 性格鑑定" color="white">
+          <div className="bg-slate-50 rounded-lg p-3 mb-3">
+            <p className="text-sm"><strong>あなたの本質：</strong><strong className="text-amber-700">「思いつきで動いているように見えて、実はかなり観察している人」</strong>です。場の空気・相手の反応・サービスの違和感を拾い、新しい形に変換する力があります。</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+            <Box title="第一印象" text="軽やか・話しやすい・柔軟。芯は強い" />
+            <Box title="思考傾向" text="具体と抽象を行き来。改善案を作れる" />
+            <Box title="感情傾向" text="内心は繊細。深く読むが、平気そうに見せる" />
+            <Box title="行動傾向" text="納得すれば早い。目的が明確な時に強い" />
+          </div>
+          <div className="bg-amber-50 border-2 border-amber-300 rounded p-3">
+            <p className="text-sm"><strong className="text-amber-800">勝ち筋：</strong>自分の発想を、見える形・買える形・伝わる形に落とすこと。</p>
+          </div>
+        </Section>
+
+        <Section icon="💼" title="4. 仕事運・事業運" color="white">
+          <p className="text-sm mb-3">この手は<strong className="text-blue-700">「未整理の課題を整理して、使える仕組みに変える」</strong>ことで運が開きます。</p>
+          <div className="space-y-2 text-xs mb-3">
+            <Box title="向く役割" text="企画者、事業開発、営業設計、AI導入支援、業務改善、プロデューサー" color="blue" />
+            <Box title="向く売り方" text="完成品より、相手の悩みを聞いて「こうすれば動く」と設計して見せる提案型" color="blue" />
+            <Box title="伸びる条件" text="短いサイクルで検証できること。反応が見えること" color="green" />
+            <Box title="避けたい環境" text="細かいルールが多く、改善提案が通りにくい場所" color="red" />
+          </div>
+          <div className="bg-purple-50 border-2 border-purple-300 rounded p-3">
+            <p className="text-sm"><strong>仕事運の核心：</strong><strong className="text-purple-700">「相手の中にある未整理の価値を引き出して形にする」</strong>と強い。表では相談役、裏では設計者として動くと、信頼と収益が同時に育ちます。</p>
+          </div>
+        </Section>
+
+        <Section icon="💰" title="5. 金運" color="white">
+          <p className="text-sm mb-3">金運は<strong className="text-amber-700">スキル・人脈・信用を積み上げて増やす相</strong>。収入源を複数作ると安定します。</p>
+          <div className="space-y-2 text-xs">
+            <Box title="強い稼ぎ方" text="相談、設計、制作、改善、教育、運用サポートを組み合わせる" color="green" />
+            <Box title="金運が上がる行動" text="作業ではなく「成果物の型」を売る。チェックリスト、診断、レポート、テンプレート化が吉" color="amber" />
+            <Box title="注意点" text="頼まれごとを安く受けすぎると消耗。最初に範囲とゴールを決める" color="red" />
+            <Box title="開運価格設計" text="単発・月額・成果物パッケージの3段階を持つと相性が良い" color="purple" />
+          </div>
+        </Section>
+
+        <Section icon="💕" title="6. 恋愛運・人間関係運" color="white">
+          <p className="text-sm mb-3">恋愛では<strong className="text-pink-700">「尊敬できるか」「自由を奪われないか」</strong>を大切にする相。対等に話せる相手と運が伸びます。</p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <Box title="恋愛の傾向" text="一気に燃えるより、信頼が積み上がるほど深くなる" color="pink" />
+            <Box title="相性が良い人" text="応援してくれる人、好奇心がある人、変化を面白がれる人" color="green" />
+            <Box title="苦手な相手" text="決めつけが強い人、依存が強い人、挑戦を止める人" color="red" />
+            <Box title="開運ポイント" text="忙しい時ほど、考えていることを短く言葉にする" color="blue" />
+          </div>
+        </Section>
+
+        <Section icon="🔮" title="7. 近未来の流れ" color="white">
+          <p className="text-sm mb-3">これからの運は<strong className="text-purple-700">「決め打ち」より「育てながら当てる」</strong>方が合います。</p>
+          <div className="space-y-2 text-xs">
+            <FutureBox color="amber" time="⚡ 今すぐ" text="散らばっているアイデアを3つの柱に整理する時期" />
+            <FutureBox color="blue" time="📅 3か月後" text="小さな実績・事例・診断コンテンツを作ると、人から相談される流れが強まる" />
+            <FutureBox color="green" time="📆 6か月後" text="紹介・口コミ・イベント経由の縁が伸びやすい" />
+            <FutureBox color="purple" time="📅 1年後" text="肩書きやサービス名を絞るほど、運命線が濃くなる" />
+          </div>
+        </Section>
+
+        <Section icon="✨" title="8. 開運アクションプラン" color="amber">
+          <div className="space-y-2">
+            {['アイデアは48時間以内に「見える形」にする', '人に説明する前に、1枚図・診断・提案書に落とす', '頼まれごとは「目的・範囲・納品物・金額」を先に決める', '月1回、不要な人間関係・作業・サービス案を削る', '直感を信じつつ、数字や反応で検証する'].map((t,i) => (
+              <div key={i} className="flex items-start gap-2">
+                <div className="w-6 h-6 rounded-full bg-amber-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">{i+1}</div>
+                <p className="text-sm pt-0.5">{t}</p>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <div className="bg-slate-700 text-white rounded-xl p-6">
+          <h4 className="text-xl font-bold mincho mb-3 text-amber-400">🎯 9. まとめ</h4>
+          <p className="text-sm mb-4">あなたの手相を一言で表すなら、<strong className="text-amber-300">「未完成のものに価値を見つけ、形に変える人」</strong>です。強みは、直感・観察・言語化・提案力。課題は考え過ぎと抱え込み。</p>
+          <div className="grid grid-cols-2 gap-2 text-xs mb-4">
+            <ThemeBox title="人生テーマ" text="自由に考え、構造化し、人の役に立つ形へ変換する" />
+            <ThemeBox title="仕事テーマ" text="相談・診断・設計・改善を商品化する" />
+            <ThemeBox title="対人テーマ" text="尊敬と自由のある関係を選ぶ" />
+            <ThemeBox title="金運テーマ" text="単発作業より、再利用できる型を作る" />
+          </div>
+          <div className="border-t border-white/20 pt-3 text-center">
+            <p className="text-amber-300 font-bold mincho">完璧より公開。悩むより試作。</p>
+          </div>
+        </div>
+      </div>
+
+      <PDFButton type={type} />
+
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 text-center mt-4">
+        <div className="text-2xl mb-2">✨</div>
+        <h3 className="font-bold mb-2">さらに詳しい恋愛・適職診断を<br/>LINEで受け取りませんか？</h3>
+        <button onClick={onLine} className="bg-gradient-to-r from-amber-500 to-orange-500 text-white py-3 px-8 rounded-xl font-bold active:scale-95 shadow-lg">
+          詳細を見る →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Section({ icon, title, color, children }) {
+  const bg = color === 'amber' ? 'bg-amber-50 border-amber-200 border-2' : 'bg-white border';
+  return (
+    <div className={`${bg} rounded-xl p-5`}>
+      <h4 className="text-lg font-bold mincho mb-3 flex items-center gap-2"><span className="text-2xl">{icon}</span><span>{title}</span></h4>
+      {children}
+    </div>
+  );
+}
+
+function LineCard({ color, title, desc, tips, last }) {
+  const colors = {
+    green: 'bg-green-50',
+    blue: 'bg-blue-50',
+    pink: 'bg-pink-50',
+    purple: 'bg-purple-50'
+  };
+  return (
+    <div className={`${last ? '' : 'border-b pb-4 mb-4'}`}>
+      <h5 className="font-bold mb-2 text-sm">{title}</h5>
+      <p className="text-sm mb-2">{desc}</p>
+      <div className={`${colors[color]} rounded-lg p-3 space-y-1 text-xs`}>
+        {tips.map((tip, i) => (
+          <p key={i}><strong>{tip.label}：</strong>{tip.text}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Box({ title, text, color = 'slate' }) {
+  const colors = {
+    slate: 'bg-slate-50',
+    blue: 'bg-blue-50',
+    green: 'bg-green-50',
+    red: 'bg-red-50',
+    pink: 'bg-pink-50',
+    purple: 'bg-purple-50',
+    amber: 'bg-amber-50'
+  };
+  return (
+    <div className={`${colors[color]} rounded p-3`}>
+      <p className="font-bold mb-1">{title}</p>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function FutureBox({ color, time, text }) {
+  const colors = {
+    amber: 'bg-amber-50 border-amber-500',
+    blue: 'bg-blue-50 border-blue-500',
+    green: 'bg-green-50 border-green-500',
+    purple: 'bg-purple-50 border-purple-500'
+  };
+  return (
+    <div className={`${colors[color]} border-l-4 rounded p-3`}>
+      <p className="font-bold mb-1">{time}</p>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function ThemeBox({ title, text }) {
+  return (
+    <div className="bg-white/10 rounded p-2">
+      <p className="font-bold text-amber-300 mb-1">{title}</p>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function PDFButton({ type }) {
+  const [generating, setGenerating] = useState(false);
+
+  const generatePDF = async () => {
+    setGenerating(true);
+    try {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'position:absolute;left:-10000px;top:0;width:800px;background:white;padding:40px;font-family:"Noto Sans JP",sans-serif;';
+      wrapper.innerHTML = createPDFHTML(type);
+      document.body.appendChild(wrapper);
+      await new Promise(r => setTimeout(r, 500));
+
+      const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true, backgroundColor: '#fff', logging: false });
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+      const pdfW = pdf.internal.pageSize.getWidth();
+      const pdfH = pdf.internal.pageSize.getHeight();
+      const imgH = (canvas.height * pdfW) / canvas.width;
+      let heightLeft = imgH;
+      let position = 0;
+      pdf.addImage(imgData, 'JPEG', 0, position, pdfW, imgH);
+      heightLeft -= pdfH;
+      while (heightLeft >= 0) {
+        position = heightLeft - imgH;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, pdfW, imgH);
+        heightLeft -= pdfH;
+      }
+      const fileName = `手相診断_${type.name}.pdf`;
+      const blob = pdf.output('blob');
+      document.body.removeChild(wrapper);
+
+      if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'application/pdf' })] })) {
+        const file = new File([blob], fileName, { type: 'application/pdf' });
+        try {
+          await navigator.share({ title: `手相診断: ${type.name}`, text: `🔮 私の診断結果は「${type.name}」でした！`, files: [file] });
+        } catch (e) {
+          if (e.name !== 'AbortError') pdf.save(fileName);
+        }
+      } else {
+        pdf.save(fileName);
+      }
+    } catch (err) {
+      alert('PDF生成に失敗しました');
+      console.error(err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-xl p-5 mb-4">
+      <h3 className="font-bold mincho text-center mb-3">📄 全診断結果をPDFで送ろう</h3>
+      <button onClick={generatePDF} disabled={generating} className={`w-full py-4 rounded-xl font-bold text-white shadow-lg ${generating ? 'bg-slate-400' : 'bg-gradient-to-r from-red-500 to-pink-500 active:scale-95'}`}>
+        {generating ? '⚙️ PDF生成中...（10〜20秒）' : '📄 全診断結果をPDFで送信'}
+      </button>
+      <p className="text-xs text-center text-slate-500 mt-2">スマホ：直接LINE/メールで送信 / PC：ダウンロード</p>
+    </div>
+  );
+}
+
+function createPDFHTML(type) {
+  return `
+    <div style="text-align:center;border-bottom:3px solid #d97706;padding-bottom:20px;margin-bottom:25px;">
+      <div style="color:#d97706;font-size:12px;letter-spacing:4px;margin-bottom:10px;font-weight:bold;">PALMISTRY × SANMEIGAKU</div>
+      <h1 style="font-size:28px;font-weight:bold;color:#1e293b;margin:0;">手相診断レポート</h1>
+    </div>
+    
+    <div style="text-align:center;background:linear-gradient(135deg,#fef3c7,#fed7aa);border-radius:12px;padding:30px;margin-bottom:25px;border:2px solid #fbbf24;">
+      <div style="font-size:48px;margin-bottom:8px;">✨</div>
+      <div style="font-size:56px;font-weight:bold;color:#d97706;margin-bottom:10px;">${type.id}</div>
+      <h2 style="font-size:28px;font-weight:bold;color:#1e293b;margin:0 0 8px 0;">${type.name}</h2>
+      <p style="color:#b45309;font-size:14px;font-weight:bold;margin:0 0 14px 0;">${type.subtitle}</p>
+      <p style="color:#334155;font-size:14px;line-height:1.8;margin:0;">${type.description}</p>
+    </div>
+    
+    <div style="background:linear-gradient(to right,#334155,#475569);color:#fbbf24;padding:14px;border-radius:10px;text-align:center;margin-bottom:20px;font-size:16px;font-weight:bold;letter-spacing:3px;">総合結論</div>
+    
+    <h3 style="font-size:22px;font-weight:bold;color:#1e293b;text-align:center;margin-bottom:25px;">自力で道を切り開く、<br/>仕事運の強い手相</h3>
+    
+    <div style="background:#f8fafc;padding:20px;border-radius:10px;margin-bottom:20px;border-left:4px solid #d97706;">
+      <h4 style="font-size:16px;font-weight:bold;margin:0 0 14px 0;">✨ あなたの5つの特徴</h4>
+      <ol style="margin:0;padding-left:20px;font-size:13px;line-height:2;">
+        <li>仕事運は強く、努力が結果に繋がる</li>
+        <li>独立心が強く、自分で道を作るタイプ</li>
+        <li>論理的で戦略を立てる力に優れる</li>
+        <li>信頼されやすいが、責任を抱え込みやすい</li>
+        <li>考えすぎて、初動が遅れがち</li>
+      </ol>
+    </div>
+    
+    <div style="background:linear-gradient(135deg,#fef3c7,#fed7aa);border-radius:12px;padding:20px;border:2px solid #fbbf24;margin-bottom:20px;">
+      <h4 style="font-size:18px;font-weight:bold;color:#1e293b;margin:0 0 12px 0;">🎯 1. 全体像</h4>
+      <p style="font-size:13px;line-height:1.9;margin:0;">写真からは、指が長めで掌はやや縦長、親指の開きが大きく、細かな線が多い印象です。<strong style="color:#b45309;">「感覚でひらめき、頭で整理し、人に伝えて形にする」</strong>タイプの手です。</p>
+    </div>
+    
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <h4 style="font-size:18px;font-weight:bold;margin:0 0 18px 0;">📋 2. 主要な線の鑑定</h4>
+      
+      <div style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid #f1f5f9;">
+        <h5 style="font-weight:bold;margin:0 0 10px 0;font-size:15px;">🌿 生命線：環境を変えながら伸びる持久力</h5>
+        <p style="font-size:13px;color:#475569;line-height:1.9;margin:0 0 12px 0;">生命線は大きくカーブし、<strong style="color:#15803d;">状況に合わせてスタイルを変えながら粘れる相</strong>です。</p>
+        <div style="background:#f0fdf4;padding:12px;border-radius:8px;font-size:12px;line-height:1.8;">
+          <p style="margin:0 0 4px 0;"><strong style="color:#166534;">✅ 開運行動：</strong>生活リズムを固定し過ぎず、集中期と回復期を分ける</p>
+          <p style="margin:0 0 4px 0;"><strong style="color:#166534;">⚠️ 弱点対策：</strong>人に見せる前の試作段階で時間を使い過ぎない</p>
+          <p style="margin:0;"><strong style="color:#166534;">🏢 合う環境：</strong>変化があり、改善の余地がある現場</p>
+        </div>
+      </div>
+      
+      <div style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid #f1f5f9;">
+        <h5 style="font-weight:bold;margin:0 0 10px 0;font-size:15px;">🧠 知能線：現実と直感をつなぐクリエイティブ脳</h5>
+        <p style="font-size:13px;color:#475569;line-height:1.9;margin:0 0 12px 0;">論理だけでなく<strong style="color:#1e40af;">イメージや雰囲気をつかむ力が強い</strong>です。</p>
+        <div style="background:#eff6ff;padding:12px;border-radius:8px;font-size:12px;line-height:1.8;">
+          <p style="margin:0 0 4px 0;"><strong style="color:#1e40af;">💪 強み：</strong>企画、言語化、UX改善、資料化、提案設計</p>
+          <p style="margin:0 0 4px 0;"><strong style="color:#1e40af;">⚠️ 注意：</strong>頭の中で完成形を作りすぎ、着手が遅くなる</p>
+          <p style="margin:0;"><strong style="color:#1e40af;">📈 伸ばし方：</strong>1案に絞る前に、3案出して比較する癖をつける</p>
+        </div>
+      </div>
+      
+      <div style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid #f1f5f9;">
+        <h5 style="font-weight:bold;margin:0 0 10px 0;font-size:15px;">💖 感情線：情は深いが、相手選びはかなり冷静</h5>
+        <p style="font-size:13px;color:#475569;line-height:1.9;margin:0 0 12px 0;">好き嫌いははっきりあるが、<strong style="color:#be185d;">表に出す前に整理するタイプ</strong>。</p>
+        <div style="background:#fdf2f8;padding:12px;border-radius:8px;font-size:12px;line-height:1.8;">
+          <p style="margin:0 0 4px 0;"><strong style="color:#be185d;">👥 対人運：</strong>深く狭い信頼関係を作るほど運が伸びる</p>
+          <p style="margin:0 0 4px 0;"><strong style="color:#be185d;">💕 恋愛運：</strong>勢いだけより、尊敬と安心が続く相手が合う</p>
+          <p style="margin:0;"><strong style="color:#be185d;">⚠️ 注意：</strong>察し過ぎて疲れる前に、自分の希望を言葉にする</p>
+        </div>
+      </div>
+      
+      <div>
+        <h5 style="font-weight:bold;margin:0 0 10px 0;font-size:15px;">⭐ 運命線：肩書きを自分で作るタイプ</h5>
+        <p style="font-size:13px;color:#475569;line-height:1.9;margin:0 0 12px 0;"><strong style="color:#6b21a8;">「やりながら自分の役割を発明する」相</strong>です。</p>
+        <div style="background:#faf5ff;padding:12px;border-radius:8px;font-size:12px;line-height:1.8;">
+          <p style="margin:0 0 4px 0;"><strong style="color:#6b21a8;">💼 仕事運：</strong>固定業務より、新規事業・改善・営業企画に相性</p>
+          <p style="margin:0 0 4px 0;"><strong style="color:#6b21a8;">✨ 開運：</strong>人から頼まれたことを商品化・仕組み化すると伸びる</p>
+          <p style="margin:0;"><strong style="color:#6b21a8;">⚠️ 注意：</strong>器用な分、何でも屋になりすぎない</p>
+        </div>
+      </div>
+    </div>
+    
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <h4 style="font-size:18px;font-weight:bold;margin:0 0 18px 0;">🧠 3. 性格鑑定</h4>
+      <div style="background:#f1f5f9;padding:14px;border-radius:10px;margin-bottom:14px;">
+        <p style="font-size:13px;line-height:1.9;margin:0;"><strong style="color:#b45309;">「思いつきで動いているように見えて、実はかなり観察している人」</strong>です。場の空気・相手の反応・サービスの違和感を拾い、新しい形に変換する力があります。</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+        <div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;"><strong>第一印象：</strong>軽やか・話しやすい・柔軟。芯は強い</div>
+        <div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;"><strong>思考傾向：</strong>具体と抽象を行き来。改善案を作れる</div>
+        <div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;"><strong>感情傾向：</strong>内心は繊細。深く読むが、平気そうに見せる</div>
+        <div style="background:#f8fafc;padding:12px;border-radius:8px;font-size:11px;"><strong>行動傾向：</strong>納得すれば早い。目的が明確な時に強い</div>
+      </div>
+      <div style="background:#fef3c7;border:2px solid #fbbf24;padding:12px;border-radius:8px;margin-top:14px;">
+        <p style="font-size:13px;margin:0;"><strong style="color:#92400e;">勝ち筋：</strong>自分の発想を、見える形・買える形・伝わる形に落とすこと</p>
+      </div>
+    </div>
+    
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <h4 style="font-size:18px;font-weight:bold;margin:0 0 18px 0;">💼 4. 仕事運・事業運</h4>
+      <p style="font-size:13px;line-height:1.9;margin:0 0 14px 0;">この手は<strong style="color:#1e40af;">「未整理の課題を整理して、使える仕組みに変える」</strong>ことで運が開きます。</p>
+      <div style="display:grid;gap:10px;font-size:12px;">
+        <div style="background:#eff6ff;padding:12px;border-radius:8px;"><strong style="color:#1e40af;">向く役割：</strong>企画者、事業開発、営業設計、AI導入支援、業務改善</div>
+        <div style="background:#eff6ff;padding:12px;border-radius:8px;"><strong style="color:#1e40af;">向く売り方：</strong>相手の悩みを聞いて「こうすれば動く」と設計して見せる提案型</div>
+        <div style="background:#f0fdf4;padding:12px;border-radius:8px;"><strong style="color:#166534;">伸びる条件：</strong>短いサイクルで検証できること。反応が見えること</div>
+        <div style="background:#fef2f2;padding:12px;border-radius:8px;"><strong style="color:#991b1b;">避けたい環境：</strong>細かいルールが多く、改善提案が通りにくい場所</div>
+      </div>
+    </div>
+    
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <h4 style="font-size:18px;font-weight:bold;margin:0 0 18px 0;">💰 5. 金運</h4>
+      <p style="font-size:13px;line-height:1.9;margin:0 0 14px 0;">金運は<strong style="color:#b45309;">スキル・人脈・信用を積み上げて増やす相</strong>です。</p>
+      <div style="display:grid;gap:10px;font-size:12px;">
+        <div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:12px;border-radius:6px;"><strong style="color:#166534;">強い稼ぎ方：</strong>相談、設計、制作、改善、教育、運用サポートを組み合わせる</div>
+        <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:12px;border-radius:6px;"><strong style="color:#92400e;">金運が上がる行動：</strong>「成果物の型」を売る。チェックリスト、診断、レポート、テンプレート化が吉</div>
+        <div style="background:#fef2f2;border-left:4px solid #ef4444;padding:12px;border-radius:6px;"><strong style="color:#991b1b;">注意点：</strong>頼まれごとを安く受けすぎると消耗。最初に範囲とゴールを決める</div>
+        <div style="background:#faf5ff;border-left:4px solid #a855f7;padding:12px;border-radius:6px;"><strong style="color:#6b21a8;">開運価格設計：</strong>単発・月額・成果物パッケージの3段階を持つと相性が良い</div>
+      </div>
+    </div>
+    
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <h4 style="font-size:18px;font-weight:bold;margin:0 0 18px 0;">💕 6. 恋愛運・人間関係運</h4>
+      <p style="font-size:13px;line-height:1.9;margin:0 0 14px 0;">恋愛では<strong style="color:#be185d;">「尊敬できるか」「自由を奪われないか」</strong>を大切にする相です。</p>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;font-size:11px;">
+        <div style="background:#fdf2f8;padding:12px;border-radius:8px;"><strong style="color:#be185d;">恋愛の傾向：</strong>信頼が積み上がるほど深くなる</div>
+        <div style="background:#f0fdf4;padding:12px;border-radius:8px;"><strong style="color:#166534;">相性が良い人：</strong>応援してくれる人、好奇心がある人</div>
+        <div style="background:#fef2f2;padding:12px;border-radius:8px;"><strong style="color:#991b1b;">苦手な相手：</strong>決めつけが強い人、依存が強い人</div>
+        <div style="background:#eff6ff;padding:12px;border-radius:8px;"><strong style="color:#1e40af;">開運ポイント：</strong>考えていることを短く言葉にする</div>
+      </div>
+    </div>
+    
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <h4 style="font-size:18px;font-weight:bold;margin:0 0 18px 0;">🔮 7. 近未来の流れ</h4>
+      <div style="display:grid;gap:10px;font-size:12px;">
+        <div style="background:linear-gradient(to right,#fef3c7,#fed7aa);border-left:4px solid #f59e0b;padding:12px;border-radius:8px;"><strong style="color:#92400e;">⚡ 今すぐ：</strong>散らばっているアイデアを3つの柱に整理する時期</div>
+        <div style="background:linear-gradient(to right,#eff6ff,#cffafe);border-left:4px solid #3b82f6;padding:12px;border-radius:8px;"><strong style="color:#1e40af;">📅 3か月後：</strong>小さな実績・事例を作ると相談される流れが強まる</div>
+        <div style="background:linear-gradient(to right,#f0fdf4,#d1fae5);border-left:4px solid #22c55e;padding:12px;border-radius:8px;"><strong style="color:#166534;">📆 6か月後：</strong>紹介・口コミ・イベント経由の縁が伸びやすい</div>
+        <div style="background:linear-gradient(to right,#faf5ff,#fdf2f8);border-left:4px solid #a855f7;padding:12px;border-radius:8px;"><strong style="color:#6b21a8;">📅 1年後：</strong>肩書きを絞るほど運命線が濃くなる</div>
+      </div>
+    </div>
+    
+    <div style="background:linear-gradient(135deg,#fef3c7,#fed7aa);border:2px solid #fbbf24;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <h4 style="font-size:18px;font-weight:bold;color:#92400e;margin:0 0 18px 0;">✨ 8. 開運アクションプラン</h4>
+      <div style="display:grid;gap:10px;">
+        ${['アイデアは48時間以内に「見える形」にする', '人に説明する前に、1枚図・診断・提案書に落とす', '頼まれごとは「目的・範囲・納品物・金額」を先に決める', '月1回、不要な人間関係・作業・サービス案を削る', '直感を信じつつ、数字や反応で検証する'].map((t,i) => `
+          <div style="display:flex;align-items:flex-start;gap:10px;">
+            <div style="width:24px;height:24px;border-radius:50%;background:#d97706;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;flex-shrink:0;">${i+1}</div>
+            <p style="font-size:13px;margin:3px 0 0 0;">${t}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <div style="background:linear-gradient(135deg,#334155,#475569);color:white;border-radius:12px;padding:25px;margin-bottom:20px;">
+      <h4 style="font-size:20px;font-weight:bold;color:#fbbf24;margin:0 0 16px 0;">🎯 9. まとめ</h4>
+      <p style="font-size:13px;line-height:2;margin:0 0 16px 0;">あなたの手相を一言で表すなら、<strong style="color:#fcd34d;">「未完成のものに価値を見つけ、形に変える人」</strong>です。</p>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:11px;margin-bottom:16px;">
+        <div style="background:rgba(255,255,255,0.1);padding:10px;border-radius:8px;"><strong style="color:#fcd34d;">人生：</strong>自由に考え、構造化し、人の役に立つ形へ</div>
+        <div style="background:rgba(255,255,255,0.1);padding:10px;border-radius:8px;"><strong style="color:#fcd34d;">仕事：</strong>相談・診断・設計・改善を商品化</div>
+        <div style="background:rgba(255,255,255,0.1);padding:10px;border-radius:8px;"><strong style="color:#fcd34d;">対人：</strong>尊敬と自由のある関係を選ぶ</div>
+        <div style="background:rgba(255,255,255,0.1);padding:10px;border-radius:8px;"><strong style="color:#fcd34d;">金運：</strong>単発作業より、再利用できる型を作る</div>
+      </div>
+      <div style="border-top:1px solid rgba(255,255,255,0.2);padding-top:12px;text-align:center;">
+        <p style="color:#fcd34d;font-size:16px;font-weight:bold;margin:0;">完璧より公開。悩むより試作。</p>
+      </div>
+    </div>
+    
+    <div style="text-align:center;color:#94a3b8;font-size:10px;margin-top:30px;padding-top:20px;border-top:2px solid #e2e8f0;">
+      <p style="margin:0 0 6px 0;">※ 手相占いとしてお楽しみください</p>
+      <p style="margin:0;font-weight:bold;color:#64748b;">手相×算命学診断アプリ</p>
+    </div>
+  `;
+}
+
+function Line({ type, onBack }) {
+  return (
+    <div className="max-w-md mx-auto px-4 pt-6 pb-12">
+      <h2 className="text-xl font-bold mincho text-center mb-2">📩 LINEで詳細診断</h2>
+      <div className="bg-white rounded-2xl shadow-xl p-6 mb-4 text-center">
+        <div className="bg-amber-50 rounded-xl p-6 mb-4 border-2 border-amber-200">
+          <div className="text-4xl mb-2">✨</div>
+          <div className="text-3xl font-bold text-amber-600 mincho">{type.id}</div>
+          <h3 className="font-bold mincho">{type.name}</h3>
+        </div>
+        <a href={LINE_URL} target="_blank" rel="noopener noreferrer" className="block bg-[#06C755] text-white py-4 rounded-xl font-bold shadow-lg active:scale-95">
+          💚 LINE友だち追加
+        </a>
+        <button onClick={onBack} className="mt-4 text-sm text-slate-500">← もう一度診断する</button>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById('root'));
+</script>
+</body>
+</html>
